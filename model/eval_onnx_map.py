@@ -18,7 +18,7 @@ CLASSES = [
     "no_truck",
 ]
 
-MODEL = "best_ckpt.pth"
+MODEL = "best_dynamic_int8.onnx"
 
 VOC_ROOT = "/home/navavision/Utkarsh-Workspace/Quant/YOLOX/datasets/VOCdevkit/VOC2012"
 

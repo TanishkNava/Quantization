@@ -9,11 +9,19 @@ __pycache__/
 *.trt
 *.pth
 
-output.jpg
+output*.jpg
 runs/
 
 datasets/
 calibration_images/
+
+# Per-model inputs (keep directory structure via .gitkeep)
+calibration/*/*
+!calibration/*/.gitkeep
+models/*/weights/*
+!models/*/weights/.gitkeep
+artifacts/*
+!artifacts/.gitkeep
 
 .DS_Store
 .vscode/

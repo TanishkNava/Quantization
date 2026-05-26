@@ -2,9 +2,9 @@ import cv2
 import numpy as np
 import onnxruntime as ort
 
-MODEL = "best_ckpt.onnx"
-IMAGE = "test.jpg"
-CLASSES = "classes.txt"
+MODEL = "/home/navavision/Utkarsh-Workspace/Quant/artifacts/gate/fp32.onnx"
+IMAGE = "/home/navavision/Utkarsh-Workspace/Quant/calibration/gate/186.jpg"
+CLASSES = "/home/navavision/Utkarsh-Workspace/Quant/models/gate/classes.txt"
 
 INPUT_SIZE = 640
 
@@ -200,6 +200,6 @@ for det in dets:
         2,
     )
 
-cv2.imwrite("output.jpg", orig)
+cv2.imwrite("output_fp32_1905.jpg", orig)
 
-print("Saved output.jpg")
+print("Saved output_fp32_1905.jpg")

@@ -2,9 +2,9 @@ import cv2
 import numpy as np
 import onnxruntime as ort
 
-MODEL = "best_int8.onnx"
-IMAGE = "test.jpg"
-CLASSES = "classes.txt"
+MODEL = "/home/navavision/Utkarsh-Workspace/Quant/artifacts/gate/int8.onnx"
+IMAGE = "/home/navavision/Utkarsh-Workspace/Quant/calibration/gate/186.jpg"
+CLASSES = "/home/navavision/Utkarsh-Workspace/Quant/models/gate/classes.txt"
 
 INPUT_SIZE = 640
 
@@ -200,6 +200,6 @@ for det in dets:
         2,
     )
 
-cv2.imwrite("output_int8.jpg", orig)
+cv2.imwrite("/home/navavision/Utkarsh-Workspace/Quant/output_int8.jpg", orig)
 
 print("Saved output_int8.jpg")
