@@ -1,0 +1,14 @@
+# Active model configuration (Edit paths and parameters here)
+
+exp_file: exps/ppe_nano/yolox_voc_nano.py
+weights: models/ppe_nano/weights/best_ckpt.pth
+classes: models/ppe_nano/classes.txt
+calibration_dir: calibration/ppe_nano
+input_size: 416
+opset: 18
+max_calib_images: 30
+calib_method: entropy
+per_channel: true
+output_dir: artifacts/ppe_nano
+conf_thres: 0.25
+nms_thres: 0.45
