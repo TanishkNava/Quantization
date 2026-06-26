@@ -1,117 +1,167 @@
-# YOLOX Quantization & Evaluation Workspace
 
-This repository provides a clean, unified workspace for applying **Post-Training Quantization (PTQ)** to YOLOX object detection models. It supports both **ONNX Runtime (ORT)** and **PyTorch Native (FX Graph Mode)** quantization, alongside dedicated scripts for inference and VOC mAP evaluation.
-
+Readme · MD
+# YOLOX Quantization
+ 
+A clean, unified workspace for applying **Post-Training Quantization (PTQ)** to YOLOX object detection models. Supports three quantization strategies — ORT static INT8, ORT dynamic INT8, and PyTorch native FX Graph Mode static INT8 — with shared inference and VOC mAP evaluation scripts.
+ 
 ---
-
-## 📁 Directory Layout
-
-The repository has been streamlined to contain only the necessary configuration, calibration data, and scripts:
-
-```text
-Quantization/
-├── config.yaml          # Unified configuration file for all models (dock, gate, ppe_nano, etc.)
-├── utils.py             # Shared helpers for preprocessing, postprocessing (NMS), and path resolution
-├── quantize_ort.py      # ONNX Runtime static INT8 quantization script
-├── quantize_pytorch.py  # PyTorch native static INT8 quantization script
-├── quantize_dynamic.py  # ONNX Runtime dynamic INT8 quantization script
-├── eval/                # Evaluation and inference scripts
-│   ├── infer_onnx.py    # Run inference on an ONNX model (FP32, static INT8, dynamic INT8)
-│   ├── eval_onnx.py     # Compute VOC mAP for an ONNX model
-│   ├── infer_pytorch.py # Run inference on a serialized PyTorch quantized model (.pt)
-│   └── eval_pytorch.py  # Compute VOC mAP for a PyTorch quantized model
-├── calibration/         # Calibration image directories per model (e.g. calibration/ppe_nano/)
-├── models/              # Tracked weights (.pth) and classes.txt per model (e.g. models/ppe_nano/)
-└── exps/                # Custom YOLOX Exp files (e.g. exps/ppe_nano/yolox_voc_nano.py)
+ 
+## Contents
+ 
+- [Directory Layout](#directory-layout)
+- [Configuration](#configuration)
+- [Quantization](#quantization)
+- [Inference](#inference)
+- [Evaluation](#evaluation)
+- [Choosing a Strategy](#choosing-a-strategy)
+---
+ 
+## Directory Layout
+ 
 ```
-
+Quantization/
+├── config.yaml             # Unified config for all models
+├── utils.py                # Preprocessing, NMS, path resolution helpers
+│
+├── quantize_ort.py         # ORT static INT8 quantization
+├── quantize_dynamic.py     # ORT dynamic INT8 quantization
+├── quantize_pytorch.py     # PyTorch native FX Graph Mode static INT8
+│
+├── eval/
+│   ├── infer_onnx.py       # ONNX inference (fp32 / static / dynamic)
+│   ├── eval_onnx.py        # VOC mAP evaluation for ONNX models
+│   ├── infer_pytorch.py    # TorchScript inference
+│   └── eval_pytorch.py     # VOC mAP evaluation for PyTorch models
+│
+├── calibration/            # Per-model calibration image dirs
+│   └── <model>/
+├── models/                 # Per-model weights (.pth) and classes.txt
+│   └── <model>/
+└── exps/                   # Custom YOLOX Exp files
+    └── <model>/
+```
+ 
+Artifacts (exported ONNX, quantized models) are written to `artifacts/<model>/` at runtime and are not tracked in version control.
+ 
 ---
-
-## ⚙️ Unified Configuration (`config.yaml`)
-
-All model configurations are kept in a single `config.yaml` file at the root. Path resolution handles absolute directories and resolves relative paths automatically against the repository root.
-
-Example configuration block:
+ 
+## Configuration
+ 
+All models are configured in a single `config.yaml` at the repo root. Paths can be absolute or relative to the repo root — both are resolved automatically.
+ 
 ```yaml
 ppe_nano:
-  exp_file: exps/ppe_nano/yolox_voc_nano.py
-  weights: models/ppe_nano/weights/best_ckpt.pth
-  classes: models/ppe_nano/classes.txt
+  exp_file:        exps/ppe_nano/yolox_voc_nano.py
+  weights:         models/ppe_nano/weights/best_ckpt.pth
+  classes:         models/ppe_nano/classes.txt
   calibration_dir: calibration/ppe_nano
-  input_size: 416
-  opset: 18
+  input_size:      416
+  opset:           18
   max_calib_images: 30
-  calib_method: entropy   # options: MinMax, Entropy, Percentile
-  output_dir: artifacts/ppe_nano
-  conf_thres: 0.25
-  nms_thres: 0.45
+  calib_method:    entropy        # MinMax | Entropy | Percentile
+  output_dir:      artifacts/ppe_nano
+  conf_thres:      0.25
+  nms_thres:       0.45
 ```
-
+ 
+Set the active model key at the top of each script, or pass it as a CLI argument where supported.
+ 
 ---
-
-## 🚀 Execution Guide
-
-Modify the active configuration in `config.yaml` to point to the desired model paths and settings.
-
-### 1. ONNX Runtime (ORT) Static Quantization
-This script exports the `.pth` weights to FP32 ONNX (if not already exported) and performs static quantization:
+ 
+## Quantization
+ 
+All three scripts read from `config.yaml` and write outputs to `artifacts/<model>/`.
+ 
+### ORT Static INT8
+ 
+Exports `.pth` → FP32 ONNX (if not already present), then runs calibration and static quantization.
+ 
 ```bash
 python quantize_ort.py
 ```
-*Outputs: `artifacts/<model>/fp32.onnx`, `artifacts/<model>/int8.onnx`*
-
-### 2. ONNX Runtime (ORT) Dynamic Quantization
-Quantizes only weights dynamically (compatible with standard CPU platforms):
+ 
+**Outputs:** `artifacts/<model>/fp32.onnx`, `artifacts/<model>/int8.onnx`
+ 
+> Best for edge CPU targets with AVX2/AVX-512 (VNNI) support where activations matter for accuracy. Calibration dataset quality directly affects output fidelity.
+ 
+---
+ 
+### ORT Dynamic INT8
+ 
+Quantizes weights only; activations remain in FP32 and are quantized at runtime. No calibration dataset required.
+ 
 ```bash
 python quantize_dynamic.py
 ```
-*Outputs: `artifacts/<model>/int8_dynamic.onnx`*
-
-### 3. PyTorch Native Static Quantization
-Performs native PyTorch PTQ in FX Graph Mode. Runs calibration using calibration dataset, converts the model, traces it, and serializes it to a TorchScript file:
+ 
+**Outputs:** `artifacts/<model>/int8_dynamic.onnx`
+ 
+> More portable across CPU platforms. Trades some accuracy for broader compatibility. Good first step when static quantization shows large accuracy drops.
+ 
+---
+ 
+### PyTorch Native Static INT8 (FX Graph Mode)
+ 
+Runs calibration through the FX-traced model, converts to a quantized representation, and serializes to TorchScript.
+ 
 ```bash
 python quantize_pytorch.py
 ```
-*Outputs: `artifacts/<model>/int8_pytorch.pt`*
-
+ 
+**Outputs:** `artifacts/<model>/int8_pytorch.pt`
+ 
+> Useful for comparing against ORT results or for PyTorch-native deployment pipelines. Note: YOLOX's custom decoupled head can affect operator fusion — validate outputs carefully.
+ 
 ---
-
-## 📊 Inference and Evaluation Guide
-
-### 1. Run Inference
-
-#### ONNX Runtime Inference
-To run inference on an image using the static INT8 ONNX model:
+ 
+## Inference
+ 
+### ONNX
+ 
 ```bash
+# Static INT8
 python eval/infer_onnx.py --image calibration/ppe_nano/60826.jpg --type int8
+ 
+# Dynamic INT8
+python eval/infer_onnx.py --image calibration/ppe_nano/60826.jpg --type dynamic
+ 
+# FP32 baseline
+python eval/infer_onnx.py --image calibration/ppe_nano/60826.jpg --type fp32
 ```
-To run using the dynamically quantized model, specify `--type dynamic`.
-*Outputs: `artifacts/<model>/infer_ort_<type>_<image_name>.jpg`*
-
-#### PyTorch Native Quantized Inference
-To run inference on an image using the TorchScript serialized model:
+ 
+**Output:** `artifacts/<model>/infer_ort_<type>_<image_name>.jpg`
+ 
+### PyTorch Native
+ 
 ```bash
 python eval/infer_pytorch.py --image calibration/ppe_nano/60826.jpg
 ```
-*Outputs: `artifacts/<model>/infer_pytorch_int8_<image_name>.jpg`*
-
+ 
+**Output:** `artifacts/<model>/infer_pytorch_int8_<image_name>.jpg`
+ 
 ---
-
-### 2. Run Dataset Evaluation (mAP)
-
-#### ONNX Runtime Evaluation
-Evaluate mAP@0.5 on a validation dataset:
+ 
+## Evaluation
+ 
+Run mAP@0.5 on a validation split to measure quantization accuracy loss.
+ 
+### ONNX
+ 
 ```bash
 python eval/eval_onnx.py \
-    --type int8 \
-    --valid_txt path/to/valid.txt \
-    --data_dir path/to/voc_dataset_dir
+  --type int8 \
+  --valid_txt /path/to/valid.txt \
+  --data_dir  /path/to/voc_dataset/
 ```
-
-#### PyTorch Native Evaluation
-Evaluate mAP@0.5 of the PyTorch native quantized model on a validation dataset:
+ 
+`--type` accepts `fp32`, `int8`, or `dynamic`.
+ 
+### PyTorch Native
+ 
 ```bash
 python eval/eval_pytorch.py \
-    --valid_txt path/to/valid.txt \
-    --data_dir path/to/voc_dataset_dir
+  --valid_txt /path/to/valid.txt \
+  --data_dir  /path/to/voc_dataset/
 ```
+ 
+---
